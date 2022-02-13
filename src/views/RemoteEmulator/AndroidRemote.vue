@@ -38,8 +38,10 @@ import {
   Back,
   View,
   InfoFilled,
+  Crop
 } from '@element-plus/icons';
 import RenderDeviceName from "../../components/RenderDeviceName.vue";
+import ControlPanel from '@/lib/control-panel/controlPanel';
 
 const {toClipboard} = useClipboard();
 const route = useRoute();
@@ -1083,6 +1085,52 @@ const getDeviceById = (id) => {
   });
 };
 
+let controlPanel = null;
+const createControlPanel = () => {
+  const canvas = document.getElementById('canvas');
+  const rect = canvas.getBoundingClientRect();
+
+  controlPanel = new ControlPanel({
+    node: 'control-panel', // id
+    panelArea: {
+      width: rect.width,
+      height: rect.height
+    }
+  });
+
+  const rocker = controlPanel.createRocker();
+
+  rocker.addEventListener('shakeChange', function (newPos, oldPos) {
+    if (oldPos.eventNum === 0) {
+      // 首次按下
+      websocket.send(
+        JSON.stringify({
+          type: 'touch',
+          detail: 'd 0 ' + Math.round(oldPos.x) + ' ' + Math.round(oldPos.y) + ' 50\n',
+        })
+      );
+    } else if (newPos.eventNum === 0) {
+      // 松开控制键盘
+      websocket.send(
+        JSON.stringify({
+          type: 'touch',
+          detail: 'u 0\n',
+        }),
+      );
+
+      return;
+    }
+
+    // 控制摇杆
+    websocket.send(
+      JSON.stringify({
+        type: 'touch',
+        detail: 'm 0 ' + Math.round(newPos.x) + ' ' + Math.round(newPos.y) + ' 50\n',
+      }),
+    );
+  });
+}
+
 onMounted(() => {
   if (store.state.project.id) {
     project.value = store.state.project;
@@ -1223,6 +1271,7 @@ onMounted(() => {
             </div>
           </template>
           <div style="margin-right: 40px; text-align: center">
+            <div id="control-panel"></div>
             <canvas
                 id="canvas"
                 @mouseup="mouseup"
@@ -1276,6 +1325,16 @@ onMounted(() => {
             </el-button-group>
           </div>
           <div style="position: absolute; right: 5px; top: 10px">
+            <el-button
+                size="small"
+                type="info"
+                circle
+                @click="createControlPanel()"
+            >
+              <el-icon :size="12" style="vertical-align: middle;">
+                <Crop />
+              </el-icon>
+            </el-button>
             <el-tooltip
                 :enterable="false"
                 effect="dark"
@@ -2506,5 +2565,9 @@ onMounted(() => {
 #debugPic {
   width: 100%;
   height: auto;
+}
+
+#control-panel {
+  position: absolute;
 }
 </style>
